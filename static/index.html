@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Data Quality Reporter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f13;
+      color: #e2e2e8;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 24px 40px;
+      border-bottom: 1px solid #1e1e2e;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+    header span { font-size: 12px; color: #6b6b80; background: #1a1a2e; padding: 3px 8px; border-radius: 4px; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed #2a2a3e;
+      border-radius: 12px;
+      padding: 60px 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 32px;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: #6c63ff; background: #13131f; }
+    .upload-zone .icon { font-size: 40px; margin-bottom: 12px; }
+    .upload-zone p { color: #9090a8; font-size: 14px; }
+    .upload-zone p strong { color: #e2e2e8; }
+    #fileInput { display: none; }
+
+    /* Summary cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #13131f;
+      border: 1px solid #1e1e2e;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card .label { font-size: 11px; color: #6b6b80; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .card .value { font-size: 28px; font-weight: 700; color: #fff; }
+    .card .sub { font-size: 12px; color: #6b6b80; margin-top: 4px; }
+    .card.warn .value { color: #f59e0b; }
+    .card.good .value { color: #10b981; }
+    .card.cached { border-color: #6c63ff44; }
+
+    /* Issues banner */
+    .issues-banner {
+      background: #1a1218;
+      border: 1px solid #7c3040;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+    }
+    .issues-banner h3 { font-size: 13px; color: #f87171; margin-bottom: 10px; }
+    .issues-banner ul { list-style: none; }
+    .issues-banner li { font-size: 13px; color: #fca5a5; padding: 3px 0; padding-left: 16px; position: relative; }
+    .issues-banner li::before { content: "→"; position: absolute; left: 0; color: #7c3040; }
+
+    .no-issues {
+      background: #121a14;
+      border: 1px solid #166534;
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 32px;
+      font-size: 13px;
+      color: #86efac;
+    }
+
+    /* Column table */
+    h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #c8c8d8; }
+
+    .col-grid { display: flex; flex-direction: column; gap: 12px; }
+
+    .col-card {
+      background: #13131f;
+      border: 1px solid #1e1e2e;
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .col-card.has-issues { border-color: #7c3040; }
+
+    .col-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .col-name { font-weight: 600; font-size: 14px; }
+    .col-type {
+      font-size: 11px;
+      background: #1e1e30;
+      color: #9090b8;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .col-issue-tag {
+      font-size: 11px;
+      background: #3a1020;
+      color: #f87171;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+
+    .col-stats {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .stat { font-size: 12px; color: #6b6b80; }
+    .stat span { color: #c8c8d8; font-weight: 500; }
+
+    /* Histogram bar */
+    .histogram { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin-top: 10px; }
+    .hbar {
+      flex: 1;
+      background: #6c63ff55;
+      border-radius: 2px 2px 0 0;
+      transition: background 0.2s;
+      min-width: 4px;
+    }
+    .hbar:hover { background: #6c63ff; }
+
+    /* Top values */
+    .top-values { margin-top: 10px; }
+    .top-value-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .tv-label { font-size: 11px; color: #9090a8; width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tv-bar-wrap { flex: 1; height: 6px; background: #1e1e2e; border-radius: 3px; }
+    .tv-bar { height: 6px; background: #6c63ff; border-radius: 3px; }
+    .tv-count { font-size: 11px; color: #6b6b80; width: 30px; text-align: right; }
+
+    /* Loader */
+    .loader {
+      text-align: center;
+      padding: 60px;
+      color: #6b6b80;
+      font-size: 14px;
+      display: none;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #1e1e2e;
+      border-top-color: #6c63ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #report { display: none; }
+    .cache-badge {
+      display: inline-block;
+      font-size: 11px;
+      background: #1a1a3a;
+      color: #6c63ff;
+      border: 1px solid #6c63ff44;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Data Quality Reporter</h1>
+  <span>Julius Hackathon Demo</span>
+</header>
+
+<div class="container">
+
+  <div class="upload-zone" id="dropZone">
+    <div class="icon">📊</div>
+    <p><strong>Drop a CSV or JSON file here</strong></p>
+    <p style="margin-top:6px">or click to browse</p>
+    <input type="file" id="fileInput" accept=".csv,.json" />
+  </div>
+
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    Analyzing your data...
+  </div>
+
+  <div id="report">
+    <div class="cards" id="cards"></div>
+    <div id="issuesBanner"></div>
+    <h2>Column Analysis</h2>
+    <div class="col-grid" id="colGrid"></div>
+  </div>
+
+</div>
+
+<script>
+  const dropZone = document.getElementById('dropZone')
+  const fileInput = document.getElementById('fileInput')
+  const loader = document.getElementById('loader')
+  const report = document.getElementById('report')
+
+  dropZone.addEventListener('click', () => fileInput.click())
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]))
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag') })
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'))
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault()
+    dropZone.classList.remove('drag')
+    handleFile(e.dataTransfer.files[0])
+  })
+
+  async function handleFile(file) {
+    if (!file) return
+    loader.style.display = 'block'
+    report.style.display = 'none'
+
+    const form = new FormData()
+    form.append('file', file)
+
+    try {
+      const res = await fetch('/analyze', { method: 'POST', body: form })
+      if (!res.ok) {
+        const err = await res.json()
+        alert('Error: ' + err.detail)
+        loader.style.display = 'none'
+        return
+      }
+      const data = await res.json()
+      renderReport(data)
+    } catch (e) {
+      alert('Request failed: ' + e.message)
+    }
+
+    loader.style.display = 'none'
+    report.style.display = 'block'
+  }
+
+  function renderReport(data) {
+    // Summary cards
+    const issueCount = data.top_issues.length
+    document.getElementById('cards').innerHTML = `
+      <div class="card ${data.cached ? 'cached' : ''}">
+        <div class="label">File</div>
+        <div class="value" style="font-size:16px;margin-top:4px">${data.filename}${data.cached ? '<span class="cache-badge">⚡ cached</span>' : ''}</div>
+        <div class="sub">fingerprint: ${data.fingerprint}</div>
+      </div>
+      <div class="card">
+        <div class="label">Rows</div>
+        <div class="value">${data.row_count.toLocaleString()}</div>
+      </div>
+      <div class="card">
+        <div class="label">Columns</div>
+        <div class="value">${data.col_count}</div>
+      </div>
+      <div class="card ${data.duplicate_rows > 0 ? 'warn' : 'good'}">
+        <div class="label">Duplicate Rows</div>
+        <div class="value">${data.duplicate_rows}</div>
+      </div>
+      <div class="card ${issueCount > 0 ? 'warn' : 'good'}">
+        <div class="label">Issues Found</div>
+        <div class="value">${issueCount}</div>
+        <div class="sub">${issueCount === 0 ? 'All clear' : 'needs review'}</div>
+      </div>
+    `
+
+    // Issues banner
+    const banner = document.getElementById('issuesBanner')
+    if (data.top_issues.length > 0) {
+      banner.innerHTML = `
+        <div class="issues-banner">
+          <h3>⚠ Issues Detected</h3>
+          <ul>${data.top_issues.map(i => `<li>${i}</li>`).join('')}</ul>
+        </div>`
+    } else {
+      banner.innerHTML = `<div class="no-issues">✓ No issues detected — data looks clean</div>`
+    }
+
+    // Columns
+    const grid = document.getElementById('colGrid')
+    grid.innerHTML = ''
+
+    for (const [col, info] of Object.entries(data.columns)) {
+      const hasIssues = info.issues.length > 0
+      const card = document.createElement('div')
+      card.className = 'col-card' + (hasIssues ? ' has-issues' : '')
+
+      let statsHtml = `
+        <div class="stat">Nulls <span>${info.null_count} (${info.null_pct}%)</span></div>
+        <div class="stat">Unique <span>${info.unique_count}</span></div>
+      `
+
+      if (info.mean !== undefined) {
+        statsHtml += `
+          <div class="stat">Mean <span>${info.mean}</span></div>
+          <div class="stat">Std <span>${info.std}</span></div>
+          <div class="stat">Min <span>${info.min}</span></div>
+          <div class="stat">Max <span>${info.max}</span></div>
+        `
+        if (info.outlier_count !== undefined) {
+          statsHtml += `<div class="stat">Outliers <span>${info.outlier_count}</span></div>`
+        }
+      }
+
+      let extraHtml = ''
+
+      // Histogram
+      if (info.histogram) {
+        const counts = info.histogram.counts
+        const maxCount = Math.max(...counts)
+        const bars = counts.map(c => {
+          const h = maxCount > 0 ? Math.max(4, Math.round((c / maxCount) * 40)) : 4
+          return `<div class="hbar" style="height:${h}px" title="${c}"></div>`
+        }).join('')
+        extraHtml += `<div class="histogram">${bars}</div>`
+      }
+
+      // Top values
+      if (info.top_values) {
+        const entries = Object.entries(info.top_values)
+        const maxVal = Math.max(...entries.map(([,v]) => v))
+        const rows = entries.map(([k, v]) => `
+          <div class="top-value-row">
+            <div class="tv-label" title="${k}">${k}</div>
+            <div class="tv-bar-wrap"><div class="tv-bar" style="width:${Math.round(v/maxVal*100)}%"></div></div>
+            <div class="tv-count">${v}</div>
+          </div>
+        `).join('')
+        extraHtml += `<div class="top-values">${rows}</div>`
+      }
+
+      card.innerHTML = `
+        <div class="col-header">
+          <span class="col-name">${col}</span>
+          <span class="col-type">${info.dtype}</span>
+          ${hasIssues ? `<span class="col-issue-tag">⚠ ${info.issues.length} issue${info.issues.length > 1 ? 's' : ''}</span>` : ''}
+        </div>
+        <div class="col-stats">${statsHtml}</div>
+        ${extraHtml}
+      `
+      grid.appendChild(card)
+    }
+  }
+</script>
+
+</body>
+</html>
