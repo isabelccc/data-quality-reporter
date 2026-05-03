@@ -1,239 +1,292 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Data Quality Reporter</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f0f13;
-      color: #e2e2e8;
-      min-height: 100vh;
+    :root {
+      --bg: #0b0b10;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --border2: #2a2a3e;
+      --text: #e2e2ee;
+      --muted: #6b6b88;
+      --accent: #7c6dfa;
+      --accent2: #06d6a0;
+      --warn: #f59e0b;
+      --danger: #f87171;
+      --good: #10b981;
     }
 
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Header */
     header {
-      padding: 24px 40px;
-      border-bottom: 1px solid #1e1e2e;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 40px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
     }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #7c6dfa, #06d6a0); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .logo h1 { font-size: 16px; font-weight: 700; color: #fff; }
+    .logo span { font-size: 11px; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .badge { font-size: 11px; background: #1a1a2e; color: var(--muted); border: 1px solid var(--border2); padding: 4px 10px; border-radius: 20px; }
 
-    header h1 { font-size: 18px; font-weight: 600; color: #fff; }
-    header span { font-size: 12px; color: #6b6b80; background: #1a1a2e; padding: 3px 8px; border-radius: 4px; }
+    /* Layout */
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
 
-    .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
-
-    /* Upload zone */
+    /* Upload */
     .upload-zone {
-      border: 2px dashed #2a2a3e;
-      border-radius: 12px;
-      padding: 60px 40px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      margin-bottom: 32px;
+      border: 2px dashed var(--border2); border-radius: 16px;
+      padding: 64px 40px; text-align: center; cursor: pointer;
+      transition: all 0.2s; margin-bottom: 40px; position: relative; overflow: hidden;
     }
-    .upload-zone:hover, .upload-zone.drag { border-color: #6c63ff; background: #13131f; }
-    .upload-zone .icon { font-size: 40px; margin-bottom: 12px; }
-    .upload-zone p { color: #9090a8; font-size: 14px; }
-    .upload-zone p strong { color: #e2e2e8; }
-    #fileInput { display: none; }
-
-    /* Summary cards */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
+    .upload-zone::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at 50% 0%, #7c6dfa08 0%, transparent 70%);
+      pointer-events: none;
     }
-
-    .card {
-      background: #13131f;
-      border: 1px solid #1e1e2e;
-      border-radius: 10px;
-      padding: 20px;
-    }
-    .card .label { font-size: 11px; color: #6b6b80; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .card .value { font-size: 28px; font-weight: 700; color: #fff; }
-    .card .sub { font-size: 12px; color: #6b6b80; margin-top: 4px; }
-    .card.warn .value { color: #f59e0b; }
-    .card.good .value { color: #10b981; }
-    .card.cached { border-color: #6c63ff44; }
-
-    /* Issues banner */
-    .issues-banner {
-      background: #1a1218;
-      border: 1px solid #7c3040;
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin-bottom: 32px;
-    }
-    .issues-banner h3 { font-size: 13px; color: #f87171; margin-bottom: 10px; }
-    .issues-banner ul { list-style: none; }
-    .issues-banner li { font-size: 13px; color: #fca5a5; padding: 3px 0; padding-left: 16px; position: relative; }
-    .issues-banner li::before { content: "→"; position: absolute; left: 0; color: #7c3040; }
-
-    .no-issues {
-      background: #121a14;
-      border: 1px solid #166534;
-      border-radius: 10px;
-      padding: 14px 20px;
-      margin-bottom: 32px;
-      font-size: 13px;
-      color: #86efac;
-    }
-
-    /* Column table */
-    h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #c8c8d8; }
-
-    .col-grid { display: flex; flex-direction: column; gap: 12px; }
-
-    .col-card {
-      background: #13131f;
-      border: 1px solid #1e1e2e;
-      border-radius: 10px;
-      padding: 18px 20px;
-    }
-    .col-card.has-issues { border-color: #7c3040; }
-
-    .col-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    .col-name { font-weight: 600; font-size: 14px; }
-    .col-type {
-      font-size: 11px;
-      background: #1e1e30;
-      color: #9090b8;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-    .col-issue-tag {
-      font-size: 11px;
-      background: #3a1020;
-      color: #f87171;
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-left: auto;
-    }
-
-    .col-stats {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-    .stat { font-size: 12px; color: #6b6b80; }
-    .stat span { color: #c8c8d8; font-weight: 500; }
-
-    /* Histogram bar */
-    .histogram { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin-top: 10px; }
-    .hbar {
-      flex: 1;
-      background: #6c63ff55;
-      border-radius: 2px 2px 0 0;
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #13131f; }
+    .upload-icon { font-size: 48px; margin-bottom: 16px; }
+    .upload-zone h2 { font-size: 18px; color: #fff; margin-bottom: 8px; }
+    .upload-zone p { color: var(--muted); font-size: 13px; }
+    .upload-btn {
+      display: inline-block; margin-top: 20px;
+      background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+      padding: 10px 24px; border-radius: 8px; cursor: pointer;
       transition: background 0.2s;
-      min-width: 4px;
     }
-    .hbar:hover { background: #6c63ff; }
-
-    /* Top values */
-    .top-values { margin-top: 10px; }
-    .top-value-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-    .tv-label { font-size: 11px; color: #9090a8; width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tv-bar-wrap { flex: 1; height: 6px; background: #1e1e2e; border-radius: 3px; }
-    .tv-bar { height: 6px; background: #6c63ff; border-radius: 3px; }
-    .tv-count { font-size: 11px; color: #6b6b80; width: 30px; text-align: right; }
+    .upload-btn:hover { background: #6a5de8; }
+    #fileInput { display: none; }
+    .sample-link { margin-top: 14px; font-size: 12px; color: var(--muted); }
+    .sample-link a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .sample-link a:hover { text-decoration: underline; }
 
     /* Loader */
-    .loader {
-      text-align: center;
-      padding: 60px;
-      color: #6b6b80;
-      font-size: 14px;
-      display: none;
-    }
-    .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid #1e1e2e;
-      border-top-color: #6c63ff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 16px;
-    }
+    .loader { text-align: center; padding: 80px; display: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loader p { color: var(--muted); font-size: 14px; }
 
+    /* Report */
     #report { display: none; }
-    .cache-badge {
-      display: inline-block;
-      font-size: 11px;
-      background: #1a1a3a;
-      color: #6c63ff;
-      border: 1px solid #6c63ff44;
-      padding: 3px 10px;
-      border-radius: 20px;
-      margin-left: 10px;
-      vertical-align: middle;
+
+    /* Top row */
+    .top-row { display: grid; grid-template-columns: 220px 1fr; gap: 20px; margin-bottom: 24px; }
+
+    /* Score gauge */
+    .score-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 28px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .score-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+    .gauge-wrap { position: relative; width: 140px; height: 80px; overflow: hidden; margin-bottom: 12px; }
+    .gauge-bg, .gauge-fill { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 140px; height: 140px; border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; border: 14px solid transparent; clip-path: inset(0 0 50% 0); }
+    .gauge-bg { border-color: var(--border2); }
+    .gauge-fill { border-color: var(--good); transition: transform 0.8s ease; transform-origin: bottom center; }
+    .score-number { font-size: 48px; font-weight: 800; color: #fff; line-height: 1; }
+    .score-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .score-grade { font-size: 13px; font-weight: 600; margin-top: 8px; padding: 4px 14px; border-radius: 20px; }
+    .grade-a { background: #0d2e1f; color: var(--good); }
+    .grade-b { background: #1a2510; color: #84cc16; }
+    .grade-c { background: #2a1e05; color: var(--warn); }
+    .grade-d { background: #2a1010; color: var(--danger); }
+
+    /* Meta cards */
+    .meta-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .mcard { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .mcard .ml { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .mcard .mv { font-size: 26px; font-weight: 700; color: #fff; }
+    .mcard .ms { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .mcard.warn .mv { color: var(--warn); }
+    .mcard.danger .mv { color: var(--danger); }
+    .mcard.good .mv { color: var(--good); }
+    .cached-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; background: #1a1a3a; color: var(--accent); border: 1px solid #7c6dfa33; padding: 3px 10px; border-radius: 20px; }
+
+    /* Issues */
+    .issues-section { margin-bottom: 24px; }
+    .issues-box { background: #180e0e; border: 1px solid #4a1a1a; border-radius: 12px; padding: 18px 20px; }
+    .issues-box h3 { font-size: 13px; color: var(--danger); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .issue-list { display: flex; flex-direction: column; gap: 6px; }
+    .issue-item { font-size: 13px; color: #fca5a5; display: flex; align-items: flex-start; gap: 8px; }
+    .issue-dot { width: 6px; height: 6px; border-radius: 50%; background: #7c3040; flex-shrink: 0; margin-top: 5px; }
+    .ok-box { background: #0a1a12; border: 1px solid #0d4a28; border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #86efac; }
+
+    /* Section headers */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .section-title { font-size: 14px; font-weight: 600; color: #c8c8d8; }
+    .export-btn {
+      font-size: 12px; color: var(--accent); background: #1a1a3a; border: 1px solid #7c6dfa33;
+      padding: 6px 14px; border-radius: 8px; cursor: pointer; transition: background 0.2s;
+    }
+    .export-btn:hover { background: #22224a; }
+
+    /* Columns */
+    .col-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+    .col-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: border-color 0.2s; }
+    .col-card.has-issues { border-color: #4a1a1a; }
+    .col-card.clean { border-color: #0d4a28; }
+
+    .col-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .col-name { font-weight: 600; font-size: 15px; }
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+    .tag-type { background: #1e1e30; color: #9090b8; }
+    .tag-warn { background: #3a1010; color: var(--danger); margin-left: auto; }
+    .tag-ok { background: #0d2e1f; color: var(--good); margin-left: auto; }
+
+    .col-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .col-stats { display: flex; flex-wrap: wrap; gap: 16px; }
+    .stat { display: flex; flex-direction: column; }
+    .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .stat-value { font-size: 16px; font-weight: 600; color: var(--text); margin-top: 2px; }
+
+    /* Null bar */
+    .null-bar-wrap { margin-top: 12px; }
+    .null-bar-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .null-bar-bg { height: 6px; background: var(--border2); border-radius: 3px; }
+    .null-bar-fill { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+
+    /* Histogram */
+    .histogram { display: flex; align-items: flex-end; gap: 3px; height: 48px; margin-top: 12px; }
+    .hbar { flex: 1; background: #7c6dfa33; border-radius: 2px 2px 0 0; transition: background 0.15s; min-width: 3px; cursor: pointer; }
+    .hbar:hover { background: var(--accent); }
+
+    /* Top values */
+    .top-values { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+    .tv-row { display: flex; align-items: center; gap: 8px; }
+    .tv-key { font-size: 11px; color: var(--muted); width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tv-track { flex: 1; height: 5px; background: var(--border2); border-radius: 3px; }
+    .tv-fill { height: 5px; background: var(--accent2); border-radius: 3px; }
+    .tv-val { font-size: 11px; color: var(--muted); width: 24px; text-align: right; }
+
+    /* Bad rows */
+    .bad-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 3px; }
+    .bad-row { font-size: 11px; color: #fca5a5; background: #1a0a0a; padding: 3px 8px; border-radius: 4px; }
+
+    /* Correlation */
+    .corr-section { margin-bottom: 32px; }
+    .corr-grid { display: grid; gap: 2px; }
+    .corr-row { display: flex; gap: 2px; }
+    .corr-cell {
+      width: 64px; height: 48px; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; border-radius: 4px; transition: opacity 0.2s;
+    }
+    .corr-label { font-size: 11px; color: var(--muted); width: 80px; display: flex; align-items: center; }
+    .corr-header { display: flex; gap: 2px; margin-bottom: 2px; padding-left: 80px; }
+    .corr-col-label { width: 64px; font-size: 10px; color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .corr-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; overflow-x: auto; }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      .top-row { grid-template-columns: 1fr; }
+      .meta-cards { grid-template-columns: repeat(2, 1fr); }
+      .col-body { grid-template-columns: 1fr; }
+      header { padding: 14px 20px; }
+      .container { padding: 24px 16px; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>Data Quality Reporter</h1>
-  <span>Julius Hackathon Demo</span>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <h1>Data Quality Reporter</h1>
+      <span>Instant CSV/JSON analysis</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="badge">Julius Hackathon 2026</div>
+  </div>
 </header>
 
 <div class="container">
 
   <div class="upload-zone" id="dropZone">
-    <div class="icon">📊</div>
-    <p><strong>Drop a CSV or JSON file here</strong></p>
-    <p style="margin-top:6px">or click to browse</p>
-    <input type="file" id="fileInput" accept=".csv,.json" />
+    <div class="upload-icon">🗂️</div>
+    <h2>Drop your data file here</h2>
+    <p>Supports CSV and JSON — get a full quality report instantly</p>
+    <label class="upload-btn">Browse file<input type="file" id="fileInput" accept=".csv,.json"/></label>
+    <div class="sample-link">No file? <a id="sampleLink">Load sample messy data →</a></div>
   </div>
 
   <div class="loader" id="loader">
     <div class="spinner"></div>
-    Analyzing your data...
+    <p>Analyzing your data…</p>
   </div>
 
   <div id="report">
-    <div class="cards" id="cards"></div>
-    <div id="issuesBanner"></div>
-    <h2>Column Analysis</h2>
-    <div class="col-grid" id="colGrid"></div>
-  </div>
 
+    <!-- Top row: score + meta -->
+    <div class="top-row">
+      <div class="score-card">
+        <div class="score-label">Quality Score</div>
+        <div class="score-number" id="scoreNum">—</div>
+        <div class="score-sub">out of 100</div>
+        <div class="score-grade" id="scoreGrade"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="meta-cards" id="metaCards"></div>
+        <div id="cachedRow"></div>
+      </div>
+    </div>
+
+    <!-- Issues -->
+    <div class="issues-section" id="issuesSection"></div>
+
+    <!-- Columns -->
+    <div class="section-header">
+      <div class="section-title">Column Analysis</div>
+      <button class="export-btn" id="exportBtn">↓ Export JSON report</button>
+    </div>
+    <div class="col-grid" id="colGrid"></div>
+
+    <!-- Correlation -->
+    <div class="corr-section" id="corrSection"></div>
+
+  </div>
 </div>
 
 <script>
+  let lastReport = null
+
   const dropZone = document.getElementById('dropZone')
   const fileInput = document.getElementById('fileInput')
   const loader = document.getElementById('loader')
   const report = document.getElementById('report')
 
-  dropZone.addEventListener('click', () => fileInput.click())
+  dropZone.addEventListener('click', e => { if (e.target !== fileInput) fileInput.click() })
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]))
-
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag') })
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'))
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault()
-    dropZone.classList.remove('drag')
-    handleFile(e.dataTransfer.files[0])
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]) })
+
+  document.getElementById('sampleLink').addEventListener('click', async () => {
+    const res = await fetch('/static/../sample_data/messy_sales.csv')
+    const blob = await res.blob()
+    const file = new File([blob], 'messy_sales.csv', { type: 'text/csv' })
+    handleFile(file)
+  })
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    if (!lastReport) return
+    const blob = new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `quality_report_${lastReport.filename}.json`
+    a.click()
   })
 
   async function handleFile(file) {
     if (!file) return
     loader.style.display = 'block'
     report.style.display = 'none'
+    dropZone.style.display = 'none'
 
     const form = new FormData()
     form.append('file', file)
@@ -244,121 +297,203 @@
         const err = await res.json()
         alert('Error: ' + err.detail)
         loader.style.display = 'none'
+        dropZone.style.display = 'block'
         return
       }
       const data = await res.json()
+      lastReport = data
       renderReport(data)
     } catch (e) {
       alert('Request failed: ' + e.message)
+      loader.style.display = 'none'
+      dropZone.style.display = 'block'
+      return
     }
 
     loader.style.display = 'none'
     report.style.display = 'block'
   }
 
-  function renderReport(data) {
-    // Summary cards
-    const issueCount = data.top_issues.length
-    document.getElementById('cards').innerHTML = `
-      <div class="card ${data.cached ? 'cached' : ''}">
-        <div class="label">File</div>
-        <div class="value" style="font-size:16px;margin-top:4px">${data.filename}${data.cached ? '<span class="cache-badge">⚡ cached</span>' : ''}</div>
-        <div class="sub">fingerprint: ${data.fingerprint}</div>
+  function gradeInfo(score) {
+    if (score >= 90) return { label: 'Excellent', cls: 'grade-a' }
+    if (score >= 75) return { label: 'Good', cls: 'grade-b' }
+    if (score >= 55) return { label: 'Fair', cls: 'grade-c' }
+    return { label: 'Needs Work', cls: 'grade-d' }
+  }
+
+  function scoreColor(score) {
+    if (score >= 90) return '#10b981'
+    if (score >= 75) return '#84cc16'
+    if (score >= 55) return '#f59e0b'
+    return '#f87171'
+  }
+
+  function renderReport(d) {
+    // Score
+    const score = d.quality_score
+    const g = gradeInfo(score)
+    document.getElementById('scoreNum').textContent = score
+    document.getElementById('scoreNum').style.color = scoreColor(score)
+    const gradeEl = document.getElementById('scoreGrade')
+    gradeEl.textContent = g.label
+    gradeEl.className = 'score-grade ' + g.cls
+
+    // Meta cards
+    const issueCount = d.top_issues.length
+    document.getElementById('metaCards').innerHTML = `
+      <div class="mcard">
+        <div class="ml">File</div>
+        <div class="mv" style="font-size:15px;margin-top:4px">${d.filename}</div>
+        <div class="ms">fp: ${d.fingerprint}</div>
       </div>
-      <div class="card">
-        <div class="label">Rows</div>
-        <div class="value">${data.row_count.toLocaleString()}</div>
+      <div class="mcard">
+        <div class="ml">Rows</div>
+        <div class="mv">${d.row_count.toLocaleString()}</div>
+        <div class="ms">${d.col_count} columns</div>
       </div>
-      <div class="card">
-        <div class="label">Columns</div>
-        <div class="value">${data.col_count}</div>
+      <div class="mcard ${d.duplicate_rows > 0 ? 'warn' : 'good'}">
+        <div class="ml">Duplicates</div>
+        <div class="mv">${d.duplicate_rows}</div>
+        <div class="ms">duplicate rows</div>
       </div>
-      <div class="card ${data.duplicate_rows > 0 ? 'warn' : 'good'}">
-        <div class="label">Duplicate Rows</div>
-        <div class="value">${data.duplicate_rows}</div>
-      </div>
-      <div class="card ${issueCount > 0 ? 'warn' : 'good'}">
-        <div class="label">Issues Found</div>
-        <div class="value">${issueCount}</div>
-        <div class="sub">${issueCount === 0 ? 'All clear' : 'needs review'}</div>
+      <div class="mcard ${issueCount > 0 ? 'danger' : 'good'}">
+        <div class="ml">Issues</div>
+        <div class="mv">${issueCount}</div>
+        <div class="ms">${issueCount === 0 ? 'all clear' : 'need review'}</div>
       </div>
     `
 
-    // Issues banner
-    const banner = document.getElementById('issuesBanner')
-    if (data.top_issues.length > 0) {
-      banner.innerHTML = `
-        <div class="issues-banner">
-          <h3>⚠ Issues Detected</h3>
-          <ul>${data.top_issues.map(i => `<li>${i}</li>`).join('')}</ul>
-        </div>`
+    // Cached badge
+    document.getElementById('cachedRow').innerHTML = d.cached
+      ? `<div class="cached-badge">⚡ Result served from cache — file unchanged</div>`
+      : ''
+
+    // Issues
+    const sec = document.getElementById('issuesSection')
+    if (d.top_issues.length > 0) {
+      sec.innerHTML = `<div class="issues-box">
+        <h3>⚠ Issues Detected</h3>
+        <div class="issue-list">${d.top_issues.map(i =>
+          `<div class="issue-item"><div class="issue-dot"></div>${i}</div>`
+        ).join('')}</div>
+      </div>`
     } else {
-      banner.innerHTML = `<div class="no-issues">✓ No issues detected — data looks clean</div>`
+      sec.innerHTML = `<div class="ok-box">✓ No issues detected — data looks clean</div>`
     }
 
     // Columns
     const grid = document.getElementById('colGrid')
     grid.innerHTML = ''
-
-    for (const [col, info] of Object.entries(data.columns)) {
+    for (const [col, info] of Object.entries(d.columns)) {
       const hasIssues = info.issues.length > 0
       const card = document.createElement('div')
-      card.className = 'col-card' + (hasIssues ? ' has-issues' : '')
+      card.className = 'col-card ' + (hasIssues ? 'has-issues' : 'clean')
+
+      const nullColor = info.null_pct > 30 ? '#f87171' : info.null_pct > 10 ? '#f59e0b' : '#10b981'
 
       let statsHtml = `
-        <div class="stat">Nulls <span>${info.null_count} (${info.null_pct}%)</span></div>
-        <div class="stat">Unique <span>${info.unique_count}</span></div>
+        <div class="stat"><span class="stat-label">Nulls</span><span class="stat-value">${info.null_count} <small style="color:var(--muted);font-size:12px">(${info.null_pct}%)</small></span></div>
+        <div class="stat"><span class="stat-label">Unique</span><span class="stat-value">${info.unique_count}</span></div>
       `
-
       if (info.mean !== undefined) {
         statsHtml += `
-          <div class="stat">Mean <span>${info.mean}</span></div>
-          <div class="stat">Std <span>${info.std}</span></div>
-          <div class="stat">Min <span>${info.min}</span></div>
-          <div class="stat">Max <span>${info.max}</span></div>
+          <div class="stat"><span class="stat-label">Mean</span><span class="stat-value">${info.mean}</span></div>
+          <div class="stat"><span class="stat-label">Median</span><span class="stat-value">${info.median}</span></div>
+          <div class="stat"><span class="stat-label">Std</span><span class="stat-value">${info.std}</span></div>
+          <div class="stat"><span class="stat-label">Min</span><span class="stat-value">${info.min}</span></div>
+          <div class="stat"><span class="stat-label">Max</span><span class="stat-value">${info.max}</span></div>
         `
-        if (info.outlier_count !== undefined) {
-          statsHtml += `<div class="stat">Outliers <span>${info.outlier_count}</span></div>`
-        }
+        if (info.outlier_count !== undefined)
+          statsHtml += `<div class="stat"><span class="stat-label">Outliers</span><span class="stat-value" style="color:${info.outlier_count>0?'#f87171':'#10b981'}">${info.outlier_count}</span></div>`
       }
 
-      let extraHtml = ''
+      let vizHtml = ''
+
+      // Null bar
+      vizHtml += `<div class="null-bar-wrap">
+        <div class="null-bar-label"><span>Null rate</span><span style="color:${nullColor}">${info.null_pct}%</span></div>
+        <div class="null-bar-bg"><div class="null-bar-fill" style="width:${info.null_pct}%;background:${nullColor}"></div></div>
+      </div>`
 
       // Histogram
       if (info.histogram) {
         const counts = info.histogram.counts
-        const maxCount = Math.max(...counts)
-        const bars = counts.map(c => {
-          const h = maxCount > 0 ? Math.max(4, Math.round((c / maxCount) * 40)) : 4
+        const mx = Math.max(...counts)
+        vizHtml += `<div class="histogram">${counts.map(c => {
+          const h = mx > 0 ? Math.max(4, Math.round((c/mx)*48)) : 4
           return `<div class="hbar" style="height:${h}px" title="${c}"></div>`
-        }).join('')
-        extraHtml += `<div class="histogram">${bars}</div>`
+        }).join('')}</div>`
       }
 
       // Top values
       if (info.top_values) {
         const entries = Object.entries(info.top_values)
-        const maxVal = Math.max(...entries.map(([,v]) => v))
-        const rows = entries.map(([k, v]) => `
-          <div class="top-value-row">
-            <div class="tv-label" title="${k}">${k}</div>
-            <div class="tv-bar-wrap"><div class="tv-bar" style="width:${Math.round(v/maxVal*100)}%"></div></div>
-            <div class="tv-count">${v}</div>
-          </div>
-        `).join('')
-        extraHtml += `<div class="top-values">${rows}</div>`
+        const mx = Math.max(...entries.map(([,v])=>v))
+        vizHtml += `<div class="top-values">${entries.map(([k,v])=>`
+          <div class="tv-row">
+            <span class="tv-key" title="${k}">${k}</span>
+            <div class="tv-track"><div class="tv-fill" style="width:${Math.round(v/mx*100)}%"></div></div>
+            <span class="tv-val">${v}</span>
+          </div>`).join('')}</div>`
+      }
+
+      // Bad rows
+      if (info.sample_bad_rows.length > 0) {
+        vizHtml += `<div class="bad-rows">${info.sample_bad_rows.map(r=>`<div class="bad-row">⚑ ${r}</div>`).join('')}</div>`
       }
 
       card.innerHTML = `
-        <div class="col-header">
+        <div class="col-top">
           <span class="col-name">${col}</span>
-          <span class="col-type">${info.dtype}</span>
-          ${hasIssues ? `<span class="col-issue-tag">⚠ ${info.issues.length} issue${info.issues.length > 1 ? 's' : ''}</span>` : ''}
+          <span class="tag tag-type">${info.dtype}</span>
+          ${hasIssues
+            ? `<span class="tag tag-warn">⚠ ${info.issues.join(' · ')}</span>`
+            : `<span class="tag tag-ok" style="margin-left:auto">✓ clean</span>`}
         </div>
-        <div class="col-stats">${statsHtml}</div>
-        ${extraHtml}
+        <div class="col-body">
+          <div class="col-stats">${statsHtml}</div>
+          <div>${vizHtml}</div>
+        </div>
       `
       grid.appendChild(card)
+    }
+
+    // Correlation heatmap
+    const corrSec = document.getElementById('corrSection')
+    if (d.correlation && d.correlation.columns && d.correlation.columns.length >= 2) {
+      const cols = d.correlation.columns
+      const matrix = d.correlation.matrix
+
+      function corrColor(v) {
+        if (v === null || isNaN(v)) return '#1e1e2e'
+        const abs = Math.abs(v)
+        if (v > 0) return `rgba(6,214,160,${0.15 + abs * 0.7})`
+        return `rgba(248,113,113,${0.15 + abs * 0.7})`
+      }
+
+      const headerCells = cols.map(c => `<div class="corr-col-label" title="${c}">${c}</div>`).join('')
+      const rows = matrix.map((row, i) => {
+        const cells = row.map((v, j) => {
+          const display = i === j ? '—' : v.toFixed(2)
+          return `<div class="corr-cell" style="background:${corrColor(i===j?null:v)};color:${Math.abs(v)>0.5&&i!==j?'#fff':'var(--text)'}" title="${cols[i]} × ${cols[j]}: ${v}">${display}</div>`
+        }).join('')
+        return `<div class="corr-row"><div class="corr-label">${cols[i]}</div>${cells}</div>`
+      }).join('')
+
+      corrSec.innerHTML = `
+        <div class="section-header"><div class="section-title">Correlation Matrix</div></div>
+        <div class="corr-wrap">
+          <div class="corr-header"><div style="width:80px"></div>${headerCells}</div>
+          <div class="corr-grid">${rows}</div>
+          <div style="margin-top:14px;font-size:11px;color:var(--muted)">
+            <span style="color:#06d6a0">■</span> positive &nbsp;
+            <span style="color:#f87171">■</span> negative &nbsp;
+            Darker = stronger correlation
+          </div>
+        </div>
+      `
+    } else {
+      corrSec.innerHTML = ''
     }
   }
 </script>

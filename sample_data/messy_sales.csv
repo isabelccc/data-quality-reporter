@@ -1,0 +1,21 @@
+order_id,customer_name,email,age,country,revenue,product,status
+1001,Alice Wang,alice@example.com,28,USA,120.50,Keyboard,completed
+1002,Bob Smith,bob@example.com,34,Canada,89.99,Mouse,completed
+1003,Carol Lee,,29,USA,450.00,Monitor,completed
+1004,Dan Park,dan@example.com,999,Korea,75.25,Keyboard,pending
+1005,Eve Chen,eve@example.com,31,USA,,Headset,completed
+1006,Frank Wu,frank@example.com,27,Canada,62.00,Mouse,completed
+1007,Grace Kim,not-an-email,25,USA,95.50,Keyboard,completed
+1008,Henry Liu,henry@example.com,30,China,88.00,Mouse,completed
+1009,Iris Zhang,,33,USA,110.00,Monitor,pending
+1010,Jack Ma,jack@example.com,28,China,9999.99,Keyboard,completed
+1011,Alice Wang,alice@example.com,28,USA,120.50,Keyboard,completed
+1012,Lena Park,lena@example.com,26,Korea,55.75,Mouse,completed
+1013,Mike Chen,mike@example.com,,Canada,200.00,Headset,completed
+1014,Nina Wu,nina@example.com,31,USA,175.50,Monitor,shipped
+1015,Oscar Liu,oscar@example.com,29,China,,Keyboard,pending
+1016,Paula Kim,paula@example.com,35,USA,95.00,Mouse,completed
+1017,Quinn Zhang,,27,Canada,130.00,Headset,completed
+1018,Ryan Wang,ryan@example.com,32,USA,88.50,Mouse,completed
+1019,Sara Smith,sara@example.com,24,USA,45.00,Keyboard,completed
+1020,Tom Lee,tom@example.com,28,China,67.25,Mouse,completed
