@@ -1,64 +1,76 @@
 # Data Quality Reporter
 
-A fast, local data quality analysis tool for CSV and JSON files. Upload a file and instantly get a full quality report — null rates, outliers, distributions, correlations, and an overall quality score.
-
-Built as a Julius hackathon project to demonstrate what a **persistence layer outside ephemeral containers** could look like.
-
-![screenshot](https://placehold.co/900x500/111118/7c6dfa?text=Data+Quality+Reporter)
+> Upload a CSV or JSON file — get a full quality report in milliseconds.  
+> Built for the **Julius Hackathon 2026** to demonstrate what a persistence + observability layer outside ephemeral containers could look like.
 
 ---
 
-## Features
+## What It Does
 
-- **Quality score** — single 0–100 score per file with letter grade
-- **Per-column analysis** — nulls, unique count, mean, median, std, min, max, outliers
+Most data analysis tools tell you *what* your data says. This tool tells you *what's wrong with it* before you analyze it.
+
+Drop in any CSV or JSON file and instantly get:
+
+- **Health score** (0–100) — single number summarizing overall data quality
+- **Per-column profiling** — nulls, unique count, mean, median, std, min, max, outliers
 - **Visual histograms** — distribution chart for every numeric column
-- **Top values** — frequency bar chart for string columns
-- **Correlation matrix** — color-coded heatmap across all numeric columns
-- **Issue detection** — flags high null rates, outliers beyond 3σ, mixed types, duplicate rows
-- **Sample bad rows** — shows exact row numbers where issues occur
-- **File fingerprint cache** — same file uploaded twice returns instantly (⚡ cached)
-- **Export** — download full report as JSON
-- **Sample data** — built-in messy dataset to demo instantly
+- **Top value frequency** — bar chart for string/categorical columns
+- **Issue detection** — flags high nulls, outliers beyond 3σ, mixed types, duplicate rows
+- **Exact bad row pointers** — "Row 4: value=5000000.00" not just "outlier found"
+- **Correlation heatmap** — color-coded matrix across all numeric columns
+- **Pipeline timing** — shows ingest → parse → profile → assemble stages with ms per step
+- **SHA-256 file fingerprint cache** — same file uploaded twice returns instantly (⚡ cached)
+- **Export JSON** — download full report for reproducibility
+
+---
+
+## Demo
+
+**One click:** hit **⚡ Load messy CRM sample** on the homepage — no file needed.
+
+The sample dataset has intentional problems:
+- Duplicate rows
+- Missing emails and revenue values
+- A revenue outlier ($5,000,000 vs ~$50 avg)
+- A mixed-type column (email column has a number `42`)
+- Empty rows
+
+The tool catches all of them and shows exactly where.
 
 ---
 
 ## Quick Start
 
-### 1. Clone
+### Requirements
+- Python 3.10+
+
+### Install & Run
+
 ```bash
 git clone https://github.com/isabelccc/data-quality-reporter.git
 cd data-quality-reporter
-```
 
-### 2. Install dependencies
-```bash
 pip install -r requirements.txt
-```
 
-### 3. Run
-```bash
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 4. Open
-```
-http://localhost:8000
-```
-
-Drop any CSV or JSON file, or click **"Load sample messy data →"** to try the built-in dataset.
+Open **http://localhost:8000**
 
 ---
 
 ## Tech Stack
 
-| Layer | Tool |
-|-------|------|
-| Backend | FastAPI (Python) |
-| Data analysis | pandas, numpy |
-| Frontend | Vanilla JS, HTML/CSS (no framework) |
-| Server | Uvicorn |
-| Caching | In-memory (SHA-256 file fingerprint) |
+| Layer | Tool | Why |
+|-------|------|-----|
+| Backend | FastAPI | Async, fast, automatic OpenAPI docs |
+| Data analysis | pandas + numpy | Industry standard, handles CSV/JSON/large files |
+| Server | Uvicorn | ASGI, production-grade |
+| Frontend | Vanilla JS + HTML/CSS | No build step, instant load, zero dependencies |
+| Fonts | DM Sans + Syne (Google Fonts) | Clean, modern, readable |
+| Caching | In-memory dict (SHA-256 key) | Zero latency on repeat uploads |
+
+No database. No Docker required. No environment variables. Just `pip install` and run.
 
 ---
 
@@ -66,84 +78,175 @@ Drop any CSV or JSON file, or click **"Load sample messy data →"** to try the 
 
 ```
 data-quality-reporter/
-├── main.py                  # FastAPI backend — analysis engine + API
-├── requirements.txt
+├── main.py                     # FastAPI app — analysis engine + all API routes
+├── requirements.txt            # 5 dependencies
 ├── sample_data/
-│   └── messy_sales.csv      # Demo dataset with intentional quality issues
+│   └── messy_sales.csv         # Demo dataset with intentional quality issues
 └── static/
-    └── index.html           # Frontend — drag-and-drop UI
+    └── index.html              # Full frontend — drag-and-drop UI, no framework
 ```
 
 ---
 
-## API
+## How It Works
+
+### The Pipeline
+
+Every uploaded file goes through 4 timed stages:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Ingest      Read bytes · SHA-256 fingerprint · cache?   │  ~0.1 ms
+│  Parse       pd.read_csv / pd.read_json · dtype infer    │  ~1–5 ms
+│  Profile     Per-column stats · rules · correlation      │  ~2–10 ms
+│  Assemble    Health score · severity · JSON response     │  ~0.02 ms
+└──────────────────────────────────────────────────────────┘
+```
+
+The pipeline timing is shown in the UI so you can see exactly where time is spent.
+
+### Health Score (0–100)
+
+Starts at 100, deductions applied for:
+
+| Issue | Penalty |
+|-------|---------|
+| Duplicate rows | up to −35 total |
+| Null rate > 20% | −4 per column |
+| Null rate > 40% | −10 per column |
+| Null rate > 60% | −18 per column |
+| Outlier detected | −3 per column |
+| High null rate flag | −6 per column |
+| Mixed types in column | −12 per column |
+
+### File Fingerprint Cache
+
+Every file is SHA-256 hashed on ingest. If you upload the same file again:
+
+```
+Upload → hash → cache hit → return instantly (⚡ cached badge shown)
+```
+
+This is the core demo of the Julius connection: **ephemeral execution, persistent results**.
+
+### Outlier Detection
+
+Uses the standard **3σ rule**:
+- Compute mean and std of each numeric column (excluding nulls)
+- Any value more than 3 standard deviations from the mean is flagged
+- The exact row number and value are shown in the UI
+
+### Correlation Matrix
+
+For datasets with 2+ numeric columns:
+- Compute Pearson correlation using pandas `.corr()`
+- Render as color-coded heatmap
+- Cyan = positive correlation, Rose = negative, darker = stronger
+
+---
+
+## API Reference
 
 ### `POST /analyze`
-Upload a CSV or JSON file, get back a full quality report.
 
-**Request:** `multipart/form-data` with `file` field
+Upload a file for analysis.
+
+**Request:** `multipart/form-data` with field `file` (`.csv` or `.json`)
 
 **Response:**
 ```json
 {
   "filename": "sales.csv",
-  "fingerprint": "a3f9c12d8e1b",
+  "fingerprint": "a3f9c12d8e1b4f2a",
   "cached": false,
-  "quality_score": 78,
+  "health_score": 72,
+  "severity": { "critical": 1, "warning": 3 },
   "row_count": 1000,
   "col_count": 8,
-  "duplicate_rows": 3,
+  "duplicate_rows": 2,
   "top_issues": [
-    "[revenue] High null rate (18.0%)",
-    "[age] 2 outlier(s) beyond 3σ"
+    "2 duplicate row(s) detected",
+    "[revenue] High null rate: 35.0%",
+    "[age] 3 outlier(s) beyond 3σ"
   ],
   "columns": {
     "revenue": {
       "dtype": "float64",
-      "null_count": 18,
-      "null_pct": 18.0,
-      "unique_count": 94,
+      "null_count": 350,
+      "null_pct": 35.0,
+      "unique_count": 88,
       "mean": 142.5,
+      "median": 120.0,
       "std": 88.2,
       "min": 0.0,
       "max": 9999.99,
-      "outlier_count": 2,
+      "outlier_count": 3,
       "histogram": { "counts": [...], "edges": [...] },
-      "issues": ["High null rate (18.0%)", "2 outlier(s) beyond 3σ"],
-      "sample_bad_rows": ["Row 10: value=9999.99"]
+      "issues": ["High null rate: 35.0%", "3 outlier(s) beyond 3σ"],
+      "sample_bad_rows": ["Row 4: value=9999.99", "Row 11: value=0.00"]
     }
   },
   "correlation": {
     "columns": ["age", "revenue"],
     "matrix": [[1.0, 0.43], [0.43, 1.0]]
-  }
+  },
+  "pipeline": [
+    { "id": "ingest",        "label": "Ingest",          "ms": 0.08 },
+    { "id": "parse",         "label": "Parse & types",   "ms": 3.21 },
+    { "id": "profile_rules", "label": "Profile + rules", "ms": 7.44 },
+    { "id": "report",        "label": "Assemble report", "ms": 0.02 }
+  ],
+  "pipeline_total_ms": 10.75
 }
 ```
+
+**Error responses:**
+- `400` — unsupported file type
+- `422` — malformed CSV/JSON
+
+---
+
+### `GET /api/sample/messy-crm.csv`
+
+Returns the built-in messy CRM demo dataset. Used by the "Load sample" button.
 
 ---
 
 ## The Julius Connection
 
-Julius runs analysis in **ephemeral containers** — great for isolation and safety, but the workflow resets each session. This project demonstrates what a **persistence layer outside the container** would look like:
+Julius runs analysis inside **ephemeral containers** — great for isolation and safety, but the workflow resets between sessions. This project demonstrates the missing layer:
 
-- File fingerprint → SHA-256 hash as cache key
-- Same file = instant cached result, no recompute
-- Full report exportable as JSON for reproducibility
-- Correlation + quality score survive beyond the container lifecycle
+```
+Container (ephemeral)          Persistence layer (this project)
+─────────────────────          ────────────────────────────────
+Run analysis             ───▶  Fingerprint file (SHA-256)
+Generate output          ───▶  Cache report by fingerprint
+Container dies           ───▶  Report survives, served instantly on re-upload
+```
 
-This maps directly to the backend architecture described in [this design doc](https://julius.ai).
+Concretely:
+- **File fingerprint** = cache key → same file = same hash = instant result
+- **Health score** = summarized output that persists outside the container
+- **Pipeline JSON** = reproducible record of what ran and how long it took
+- **Export** = full report downloadable as JSON for audit trail
+
+The argument: keep execution ephemeral, make everything around it durable.
 
 ---
 
-## Sample Data
+## Hackathon Pitch (60 seconds)
 
-`sample_data/messy_sales.csv` is an intentionally messy 20-row sales dataset with:
-- Missing emails and ages
-- An outlier revenue value ($9,999.99)
-- A duplicate row
-- An unrealistic age (999)
+> "Julius is fast at analysis but stateless between sessions — the same file triggers a full re-run every time. We built a quality reporting layer that sits outside the container: fingerprint every file on ingest, cache the report, and surface data issues before analysis begins. The result: instant repeat analysis, reproducible quality scores, and exact row-level issue detection. This is what the persistence layer Julius is missing looks like."
 
-Perfect for demoing all issue-detection features.
+---
+
+## What's Next
+
+- **LLM narrative** — send column stats to Claude API, get back plain-English summary: *"Your revenue column has 3 outliers that appear to be data entry errors. Row 4 is 35x the median."*
+- **Before/after diff** — upload v1 and v2 of the same dataset, highlight quality regressions
+- **Async pipeline** — queue large files, poll for result with job ID
+- **Scheduled checks** — run report on a cron, alert when score drops below threshold
+- **Multi-file join detection** — auto-detect shared keys across uploaded files
 
 ---
 
