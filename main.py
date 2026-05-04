@@ -197,22 +197,26 @@ async def generate_narrative(report: dict):
         raise HTTPException(status_code=503, detail="GOOGLE_API_KEY not configured")
 
     try:
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
     except ImportError:
-        raise HTTPException(status_code=503, detail="google-generativeai package not installed")
+        raise HTTPException(status_code=503, detail="google-genai package not installed")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
-        system_instruction=(
-            "You are a data quality analyst. Given structured statistics about a dataset, "
-            "write a concise 3-5 sentence plain-English summary. Be specific: name the columns with problems, "
-            "give the actual numbers, and suggest one concrete fix for the most critical issue. "
-            "Do not use bullet points. Write in a direct, professional tone."
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        config=types.GenerateContentConfig(
+            system_instruction=(
+                "You are a data quality analyst. Given structured statistics about a dataset, "
+                "write a concise 3-5 sentence plain-English summary. Be specific: name the columns with problems, "
+                "give the actual numbers, and suggest one concrete fix for the most critical issue. "
+                "Do not use bullet points. Write in a direct, professional tone."
+            ),
+            max_output_tokens=512,
+            temperature=0.4,
         ),
+        contents=_build_narrative_prompt(report),
     )
-
-    response = model.generate_content(_build_narrative_prompt(report))
     return {"narrative": response.text}
 
 

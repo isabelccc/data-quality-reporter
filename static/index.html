@@ -716,8 +716,11 @@
     let lastData = null
     let llmEnabled = false
 
-    // Check if LLM is available
-    fetch('/api/status').then(r => r.json()).then(s => { llmEnabled = s.llm_enabled }).catch(() => {})
+    // Fetch status eagerly; re-check before first render if needed
+    const statusReady = fetch('/api/status')
+      .then(r => r.json())
+      .then(s => { llmEnabled = s.llm_enabled })
+      .catch(() => {})
 
     dropZone.addEventListener('click', (e) => {
       if (e.target !== demoBtn && e.target !== salesBtn) fileInput.click()
@@ -815,6 +818,7 @@
       if (!file) return
       loader.classList.add('on')
       report.classList.remove('on')
+      await statusReady  // ensure llmEnabled is resolved before we render
       const form = new FormData()
       form.append('file', file)
       try {
