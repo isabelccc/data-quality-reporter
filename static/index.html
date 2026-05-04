@@ -557,6 +557,70 @@
 
     /* Median stat highlight */
     .stat.median span { color: var(--cyan); }
+
+    /* AI Narrative */
+    .narrative-section {
+      margin-bottom: 28px;
+    }
+    .narrative-card {
+      border-radius: 16px;
+      padding: 22px 24px;
+      background: linear-gradient(135deg, rgba(167,139,250,0.08), rgba(34,211,238,0.06));
+      border: 1px solid rgba(167,139,250,0.3);
+    }
+    .narrative-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .narrative-header h3 {
+      font-family: Syne, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--violet);
+      letter-spacing: -0.01em;
+    }
+    .narrative-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .narrative-text.muted { color: var(--muted); font-style: italic; }
+    .ai-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(167,139,250,0.45);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--violet);
+      background: rgba(167,139,250,0.1);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .ai-btn:hover { background: rgba(167,139,250,0.2); transform: translateY(-1px); }
+    .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .ai-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(167,139,250,0.3);
+      border-top-color: var(--violet);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    .powered-by {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 10px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -581,7 +645,10 @@
         <p><strong>Drop CSV or JSON</strong> — or click to browse</p>
         <p style="margin-top: 8px">Duplicate rows · null spikes · 3σ outliers · mixed-type columns</p>
         <input type="file" id="fileInput" accept=".csv,.json" />
-        <button type="button" class="demo-btn" id="demoBtn">⚡ Load messy CRM sample</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+          <button type="button" class="demo-btn" id="demoBtn" style="margin-top:0">⚡ Messy CRM</button>
+          <button type="button" class="demo-btn" id="salesBtn" style="margin-top:0;background:linear-gradient(105deg,var(--violet),#818cf8);box-shadow:0 8px 24px rgba(167,139,250,0.25)">⚡ Messy Sales</button>
+        </div>
       </div>
 
       <aside class="health-card" id="healthCard" style="opacity:0.35">
@@ -617,6 +684,18 @@
 
       <div class="cards" id="cards"></div>
       <div id="issuesBanner"></div>
+
+      <div class="narrative-section" id="narrativeSection" style="display:none">
+        <div class="narrative-card">
+          <div class="narrative-header">
+            <h3>✨ AI Data Quality Summary</h3>
+            <button class="ai-btn" id="narrativeBtn">✨ Generate Summary</button>
+          </div>
+          <p class="narrative-text muted" id="narrativeText">Click "Generate Summary" to get a plain-English analysis powered by Gemini.</p>
+          <p class="powered-by" id="poweredBy"></p>
+        </div>
+      </div>
+
       <h2 class="section-title">
         Column-level profile
         <button class="export-btn" id="exportBtn">↓ Export JSON</button>
@@ -632,10 +711,17 @@
     const loader = document.getElementById('loader')
     const report = document.getElementById('report')
     const demoBtn = document.getElementById('demoBtn')
+    const salesBtn = document.getElementById('salesBtn')
     const healthCard = document.getElementById('healthCard')
     let lastData = null
+    let llmEnabled = false
 
-    dropZone.addEventListener('click', (e) => { if (e.target !== demoBtn) fileInput.click() })
+    // Check if LLM is available
+    fetch('/api/status').then(r => r.json()).then(s => { llmEnabled = s.llm_enabled }).catch(() => {})
+
+    dropZone.addEventListener('click', (e) => {
+      if (e.target !== demoBtn && e.target !== salesBtn) fileInput.click()
+    })
     dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click() } })
     fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]))
 
@@ -646,6 +732,13 @@
       handleFile(new File([blob], 'messy-crm-sample.csv', { type: 'text/csv' }))
     })
 
+    salesBtn.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const res = await fetch('/api/sample/messy-sales.csv')
+      const blob = await res.blob()
+      handleFile(new File([blob], 'messy-sales-sample.csv', { type: 'text/csv' }))
+    })
+
     document.getElementById('exportBtn').addEventListener('click', () => {
       if (!lastData) return
       const blob = new Blob([JSON.stringify(lastData, null, 2)], { type: 'application/json' })
@@ -653,6 +746,37 @@
       a.href = URL.createObjectURL(blob)
       a.download = `quality_report_${lastData.filename}.json`
       a.click()
+    })
+
+    document.getElementById('narrativeBtn').addEventListener('click', async () => {
+      if (!lastData) return
+      const btn = document.getElementById('narrativeBtn')
+      const textEl = document.getElementById('narrativeText')
+      const poweredBy = document.getElementById('poweredBy')
+      btn.disabled = true
+      btn.innerHTML = '<span class="ai-spinner"></span> Thinking…'
+      textEl.className = 'narrative-text muted'
+      textEl.textContent = 'Generating analysis…'
+      try {
+        const res = await fetch('/api/narrative', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lastData),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          textEl.textContent = 'Error: ' + (err.detail || res.statusText)
+        } else {
+          const data = await res.json()
+          textEl.className = 'narrative-text'
+          textEl.textContent = data.narrative
+          poweredBy.textContent = 'Powered by Gemini 2.0 Flash'
+        }
+      } catch (e) {
+        textEl.textContent = 'Request failed: ' + e.message
+      }
+      btn.disabled = false
+      btn.innerHTML = '✨ Regenerate'
     })
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag') })
@@ -712,6 +836,18 @@
     function renderReport(data) {
       setRingScore(data.health_score ?? 0)
       renderPipeline(data.pipeline || [], data.pipeline_total_ms)
+
+      // Show narrative section, reset state for new file
+      const narrativeSection = document.getElementById('narrativeSection')
+      const narrativeText = document.getElementById('narrativeText')
+      const narrativeBtn = document.getElementById('narrativeBtn')
+      const poweredBy = document.getElementById('poweredBy')
+      narrativeSection.style.display = llmEnabled ? 'block' : 'none'
+      narrativeText.className = 'narrative-text muted'
+      narrativeText.textContent = 'Click "Generate Summary" to get a plain-English analysis powered by Gemini.'
+      narrativeBtn.disabled = false
+      narrativeBtn.innerHTML = '✨ Generate Summary'
+      poweredBy.textContent = ''
 
       const issueCount = (data.top_issues || []).length
       const sev = data.severity || { critical: 0, warning: 0 }

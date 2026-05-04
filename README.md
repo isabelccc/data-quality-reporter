@@ -21,12 +21,13 @@ Drop in any CSV or JSON file and instantly get:
 - **Pipeline timing** — shows ingest → parse → profile → assemble stages with ms per step
 - **SHA-256 file fingerprint cache** — same file uploaded twice returns instantly (⚡ cached)
 - **Export JSON** — download full report for reproducibility
+- **✨ AI narrative** — one-click plain-English summary via Gemini 2.0 Flash (requires `GOOGLE_API_KEY`)
 
 ---
 
 ## Demo
 
-**One click:** hit **⚡ Load messy CRM sample** on the homepage — no file needed.
+**One click:** hit **⚡ Messy CRM** or **⚡ Messy Sales** on the homepage — no file needed.
 
 The sample dataset has intentional problems:
 - Duplicate rows
@@ -52,10 +53,16 @@ cd data-quality-reporter
 
 pip install -r requirements.txt
 
+# Optional: enable AI narrative (Gemini)
+cp .env.example .env
+# Edit .env and add your GOOGLE_API_KEY
+
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Open **http://localhost:8000**
+
+Get a free Gemini API key at [aistudio.google.com](https://aistudio.google.com/app/apikey) — the app runs fully without it.
 
 ---
 
@@ -69,8 +76,9 @@ Open **http://localhost:8000**
 | Frontend | Vanilla JS + HTML/CSS | No build step, instant load, zero dependencies |
 | Fonts | DM Sans + Syne (Google Fonts) | Clean, modern, readable |
 | Caching | In-memory dict (SHA-256 key) | Zero latency on repeat uploads |
+| LLM | Gemini 2.0 Flash (optional) | Plain-English data quality narrative |
 
-No database. No Docker required. No environment variables. Just `pip install` and run.
+No database. No Docker required. Runs with just `pip install` — Gemini key is optional.
 
 ---
 
@@ -79,7 +87,8 @@ No database. No Docker required. No environment variables. Just `pip install` an
 ```
 data-quality-reporter/
 ├── main.py                     # FastAPI app — analysis engine + all API routes
-├── requirements.txt            # 5 dependencies
+├── requirements.txt            # 7 dependencies
+├── .env.example                # Copy to .env and add GOOGLE_API_KEY for AI narrative
 ├── sample_data/
 │   └── messy_sales.csv         # Demo dataset with intentional quality issues
 └── static/
@@ -206,9 +215,31 @@ Upload a file for analysis.
 
 ---
 
+### `POST /api/narrative`
+
+Generate a plain-English summary using Gemini 2.0 Flash. Requires `GOOGLE_API_KEY`.
+
+**Request:** JSON body — the full report object returned by `/analyze`
+
+**Response:** `{ "narrative": "Your dataset has 3 critical issues..." }`
+
+---
+
 ### `GET /api/sample/messy-crm.csv`
 
-Returns the built-in messy CRM demo dataset. Used by the "Load sample" button.
+Returns the built-in messy CRM demo dataset.
+
+---
+
+### `GET /api/sample/messy-sales.csv`
+
+Returns the messy sales orders demo dataset.
+
+---
+
+### `GET /api/status`
+
+Returns `{ "llm_enabled": true/false, "cached_reports": N }` — used by the frontend to show/hide the AI Summary button.
 
 ---
 
@@ -242,7 +273,7 @@ The argument: keep execution ephemeral, make everything around it durable.
 
 ## What's Next
 
-- **LLM narrative** — send column stats to Claude API, get back plain-English summary: *"Your revenue column has 3 outliers that appear to be data entry errors. Row 4 is 35x the median."*
+- ✅ **LLM narrative** — Gemini 2.0 Flash produces plain-English summary: *"Your revenue column has 3 outliers that appear to be data entry errors. Row 4 is 35x the median."*
 - **Before/after diff** — upload v1 and v2 of the same dataset, highlight quality regressions
 - **Async pipeline** — queue large files, poll for result with job ID
 - **Scheduled checks** — run report on a cron, alert when score drops below threshold

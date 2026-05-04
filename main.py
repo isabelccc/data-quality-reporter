@@ -3,7 +3,7 @@ Data Quality Reporter — FastAPI backend.
 Pipeline: Ingest → Parse → Profile + rules → Correlate → Assemble.
 """
 from __future__ import annotations
-import io, hashlib, time
+import io, hashlib, os, time
 from typing import Any
 import numpy as np
 import pandas as pd
@@ -11,6 +11,12 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 app = FastAPI(title="Data Quality Reporter", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -159,6 +165,57 @@ async def analyze_file(file: UploadFile = File(...)):
     return report
 
 
+def _build_narrative_prompt(report: dict) -> str:
+    """Build a concise stats summary to send to Claude."""
+    lines = [
+        f"File: {report.get('filename', 'unknown')}",
+        f"Rows: {report.get('row_count')}, Columns: {report.get('col_count')}",
+        f"Health score: {report.get('health_score')}/100",
+        f"Duplicate rows: {report.get('duplicate_rows', 0)}",
+        f"Top issues: {', '.join(report.get('top_issues', [])) or 'none'}",
+        "",
+        "Column details:",
+    ]
+    for col, info in (report.get("columns") or {}).items():
+        parts = [f"  {col} ({info.get('dtype')}): {info.get('null_pct', 0)}% nulls"]
+        if info.get("mean") is not None:
+            parts.append(f"mean={info['mean']}, median={info.get('median')}, std={info.get('std')}")
+        if info.get("outlier_count"):
+            parts.append(f"{info['outlier_count']} outlier(s)")
+        if info.get("issues"):
+            parts.append(f"issues: {'; '.join(info['issues'])}")
+        lines.append(", ".join(parts))
+
+    return "\n".join(lines)
+
+
+@app.post("/api/narrative")
+async def generate_narrative(report: dict):
+    """Call Gemini to produce a plain-English data quality narrative."""
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="GOOGLE_API_KEY not configured")
+
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        raise HTTPException(status_code=503, detail="google-generativeai package not installed")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-flash",
+        system_instruction=(
+            "You are a data quality analyst. Given structured statistics about a dataset, "
+            "write a concise 3-5 sentence plain-English summary. Be specific: name the columns with problems, "
+            "give the actual numbers, and suggest one concrete fix for the most critical issue. "
+            "Do not use bullet points. Write in a direct, professional tone."
+        ),
+    )
+
+    response = model.generate_content(_build_narrative_prompt(report))
+    return {"narrative": response.text}
+
+
 @app.get("/api/sample/messy-crm.csv")
 async def sample_messy_crm():
     csv = """user_id,email,signup_date,revenue_usd,segment,last_login
@@ -175,6 +232,20 @@ async def sample_messy_crm():
 """
     return Response(content=csv, media_type="text/csv",
                     headers={"Content-Disposition": 'inline; filename="messy-crm-sample.csv"'})
+
+
+@app.get("/api/sample/messy-sales.csv")
+async def sample_messy_sales():
+    with open("sample_data/messy_sales.csv", encoding="utf-8") as f:
+        content = f.read()
+    return Response(content=content, media_type="text/csv",
+                    headers={"Content-Disposition": 'inline; filename="messy-sales-sample.csv"'})
+
+
+@app.get("/api/status")
+async def status():
+    has_llm = bool(os.environ.get("GOOGLE_API_KEY"))
+    return {"llm_enabled": has_llm, "cached_reports": len(cache)}
 
 
 @app.get("/", response_class=HTMLResponse)
