@@ -265,21 +265,7 @@ The argument: keep execution ephemeral, make everything around it durable.
 
 ---
 
-## Hackathon Pitch (60 seconds)
 
-> "Julius is fast at analysis but stateless between sessions — the same file triggers a full re-run every time. We built a quality reporting layer that sits outside the container: fingerprint every file on ingest, cache the report, and surface data issues before analysis begins. The result: instant repeat analysis, reproducible quality scores, and exact row-level issue detection. This is what the persistence layer Julius is missing looks like."
-
----
-
-## What's Next
-
-- ✅ **LLM narrative** — Gemini 2.0 Flash produces plain-English summary: *"Your revenue column has 3 outliers that appear to be data entry errors. Row 4 is 35x the median."*
-- **Before/after diff** — upload v1 and v2 of the same dataset, highlight quality regressions
-- **Async pipeline** — queue large files, poll for result with job ID
-- **Scheduled checks** — run report on a cron, alert when score drops below threshold
-- **Multi-file join detection** — auto-detect shared keys across uploaded files
-
----
 
 ## License
 
